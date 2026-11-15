@@ -36,6 +36,29 @@ html{height:100%;overflow:hidden}body{height:100vh;height:100dvh;overflow:hidden
 .related-chip{font-size:11px;min-height:31px;white-space:nowrap;padding:5px 9px;color:#1d5452;border:1px solid #c2dcda;background:#fff;border-radius:7px}
 .related-chip:hover{background:#d6eee8}
 @media(max-width:680px){.selection-detail:has(.related-distances){flex-direction:column;align-items:stretch;gap:4px;min-height:70px}.related-distances{width:100%}}
+/* Prevent pointer-driven detail changes from resizing the map. */
+.selection-detail,
+.selection-detail:has(.related-distances) {
+  height:78px;
+  min-height:78px;
+  max-height:78px;
+  flex:0 0 78px;
+  overflow:hidden;
+  flex-wrap:nowrap;
+}
+.selection-detail:has(.related-distances) .related-distances {
+  min-height:0;
+  max-height:58px;
+}
+@media(max-width:680px) {
+  .selection-detail,
+  .selection-detail:has(.related-distances) {
+    height:86px;
+    min-height:86px;
+    max-height:86px;
+    flex-basis:86px;
+  }
+}
 </style>
 </head>
 <body>
@@ -431,7 +454,7 @@ html{height:100%;overflow:hidden}body{height:100vh;height:100dvh;overflow:hidden
     const target=event.target.closest('[data-node],[data-edge]');if(!target)return;
     event.preventDefault();if(target.dataset.node!==undefined)chooseNode(Number(target.dataset.node));else choosePair(target.dataset.edge);
   });
-  svg.addEventListener('pointerover',event=>{if(tool!=='pan'||state.pair)return;const g=event.target.closest('[data-edge]');if(g)setDetail(DATA.edges.find(e=>e.id===g.dataset.edge));});
+  // Pointer hover does not mutate the detail panel: select an edge to inspect it.
 
   DATA.nodes.forEach(n=>{const o=document.createElement('option');o.value=n.id;o.textContent=n.name;$('focus-node').append(o);});
   for(const e of DATA.edges) {
@@ -511,8 +534,13 @@ html{height:100%;overflow:hidden}body{height:100vh;height:100dvh;overflow:hidden
     finally{button.disabled=false;}
   });
   window.addEventListener('pagehide',()=>{try{state.camera={...camera};localStorage.setItem(STORAGE,JSON.stringify(state));}catch{}});
+  let lastFrameWidth=0,lastFrameHeight=0;
   new ResizeObserver(()=>{
     if(!ready)return;
+    const w=frame.clientWidth,h=frame.clientHeight;
+    if(w<1||h<1||Math.abs(w-lastFrameWidth)<1&&Math.abs(h-lastFrameHeight)<1)return;
+    lastFrameWidth=w;lastFrameHeight=h;
+    // Refit only when the viewport truly changes, not when SVG content is redrawn.
     if(state.viewFit)fit(state.viewFit==='map'?DATA.mapBounds:DATA.focusBounds,false);
     else{setView();requestRender();}
   }).observe(frame);
